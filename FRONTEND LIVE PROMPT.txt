@@ -1,0 +1,176 @@
+PROMPT — BUILD MEDIVAULT AI FRONTEND (FIGMA AI TARGETED, CONNECTED TO LIVE BACKEND)
+
+OVERVIEW
+This prompt is targeted at Figma AI / Figma plugin automation that will generate a production-grade frontend (components, prototypes, and developer handoff code) wired to the live backend. The frontend is built in Figma and exported to your chosen framework (Next.js / Framer / React). All network calls must use the centralized API configuration and follow the integration rules below.
+
+LIVE BACKEND
+- Use the tunnel URL supplied by the backend operator exactly as the `API_BASE_URL`.
+- All routes are under `${API_BASE_URL}/api/v1/` (Swagger: `${API_BASE_URL}/docs`).
+
+ENV & CONFIG
+- Frontend environment variable: `NEXT_PUBLIC_API_BASE_URL` (or equivalent runtime override in Framer).
+- Create a single API module (example path: `/lib/apiConfig.ts`) that exports:
+  - `BASE_URL` (from env)
+  - `defaultHeaders(token?: string)` — must include `ngrok-skip-browser-warning: true` and `Content-Type: application/json` by default
+  - `apiFetch(path, options, token?)` — central wrapper that throws on non-OK and returns JSON
+
+RULES FOR GENERATED CODE (MANDATORY)
+- Zero hardcoded URLs in components — import `BASE_URL` only.
+- All requests must include header `ngrok-skip-browser-warning: true`.
+- File uploads: use `FormData`, do NOT set `Content-Type` header manually (browser sets boundary); still include `ngrok-skip-browser-warning` and `Authorization` headers.
+- Auth tokens: store `access_token` in memory or secure cookie; prefer httpOnly secure cookie for production. Never leak `refresh_token` to client JS if you can use httpOnly cookie for refresh flows.
+- On 401: attempt a single refresh (`POST /api/v1/auth/refresh`), retry original request once, else redirect to login.
+
+API SURFACE (Complete & Canonical)
+Base: `${BASE_URL}/api/v1`
+
+Auth
+- POST `/auth/register` — body: { name, email, password, date_of_birth?, gender?, phone? } → returns `{ access_token, refresh_token, token_type }`
+- POST `/auth/login` — body: { email, password } → returns token pair
+- POST `/auth/refresh` — body: { refresh_token } → returns new token pair
+- POST `/auth/logout` — body: { refresh_token } — requires `Authorization`
+
+System
+- GET `/system/health` — public health check (expected JSON `{status, app_name, version}`)
+
+Records & Documents
+- POST `/records/upload` — multipart: `file`, `category` → returns record metadata
+- GET `/records` — list
+- GET `/records/{id}` — get file metadata
+- DELETE `/records/{id}`
+
+Blood Reports
+- POST `/blood/analyze` — multipart file → returns AI extraction JSON
+- GET `/blood/history`
+
+Journal / Whisper
+- POST `/journal/transcribe` — multipart audio → returns transcript
+- POST `/journal/create` — JSON `{transcript, symptom_tags, mood_tags}`
+- GET `/journal/history`
+
+Timeline
+- GET `/timeline/get_chronological_feed`
+
+AI Chat (SSE Streaming)
+- POST `/ai/chat` — body: { message } → `text/event-stream` SSE. Events lines: `data: {"type":"start"}` / `data: {"type":"token","content":"..."}` / `data: {"type":"done"}`
+
+Insights
+- GET `/insights/get_symptom_trends`
+- GET `/insights/get_compliance_metrics`
+
+Medications
+- Full REST: GET, POST, PUT, DELETE `/medications`
+
+Doctors
+- GET `/doctors/query_directory?specialty=&search=`
+- POST `/doctors/book_appointment`
+- GET `/doctors/list_appointments`
+
+Family
+- POST `/family/manage_members`
+- GET `/family/fetch_profiles`
+
+Wearables
+- POST `/wearables/sync_telemetry` (JSON telemetry batch)
+- GET `/wearables/get_historical_metrics`
+
+Emergency Card
+- GET `/emergency-card/fetch`
+- POST `/emergency-card/generate_metadata`
+
+DATA SHAPES / DB SUMMARY (for component wiring & mock data)
+These reflect the backend models and are safe reference shapes for UI mockups and API contracts.
+
+- `User`:
+  - id: UUID
+  - name: string
+  - email: string
+  - date_of_birth: date | null
+  - gender: "male" | "female" | "other" | "prefer_not_to_say"
+  - phone: string | null
+  - role: "user" | "admin" | "doctor"
+
+- `MedicalRecord`:
+  - id: UUID
+  - user_id: UUID
+  - category: enum("prescription","blood_report","scan","note","other")
+  - file_url: string
+  - file_hash: string
+  - upload_date: ISO timestamp
+
+- `BloodReport`:
+  - id: UUID
+  - user_id: UUID
+  - extracted_values: JSON object (biomarker → value)
+  - analysis: string | null
+  - report_date: date
+
+- `Medication` (example): id, user_id, medication_name, dosage, frequency, start_date, end_date
+
+- `SymptomEntry`:
+  - id: UUID
+  - user_id: UUID
+  - transcript: string
+  - symptom_tags: string[]
+  - mood_tags: string[]
+  - timestamp: ISO timestamp
+
+DB ENUMS (case-sensitive values)
+- `userrole`: ["user","admin","doctor"] — ensure frontend uses lowercase values when sending or interpreting role fields.
+- `gender`: ["male","female","other","prefer_not_to_say"]
+
+FRONTEND COMPONENTS → API MAPPING (concise mapping Figma AI can wire)
+- `Auth/RegisterForm` → POST `/auth/register` (on success: set tokens, redirect to dashboard)
+- `Auth/LoginForm` → POST `/auth/login` (on success: set tokens)
+- `Header` → shows logged-in user; reads `GET /users/me` if available (otherwise infer from token)
+- `Records/UploadDropzone` → POST `/records/upload` (multipart) + progress UI
+- `Blood/Analyzer` → POST `/blood/analyze` (multipart), show extraction + historical chart via `/blood/history`
+- `Journal/Record` → audio recorder component → POST `/journal/transcribe` then `/journal/create`
+- `ChatCanvas` → POST `/ai/chat` using SSE streaming; render incremental tokens as they arrive
+- `Timeline/Feed` → GET `/timeline/get_chronological_feed`
+- `Medications/List` → GET `/medications` + create/edit/delete flows
+- `Doctors/Search` → GET `/doctors/query_directory` + booking flow
+- `Family/Manager` → POST `/family/manage_members`, GET `/family/fetch_profiles`
+- `Wearables/Dashboard` → GET `/wearables/get_historical_metrics` (polling or on-demand)
+- `EmergencyCard/View` → GET `/emergency-card/fetch`
+
+SSE / Streaming Implementation Notes (for Figma-generated code)
+- Use native `EventSource` where possible for `/ai/chat`, but if SSE requires Authorization header, implement streaming via `fetch` + `ReadableStream` parsing and decode lines starting with `data:`.
+- Ensure UI gracefully handles reconnects and shows a live typing indicator while streaming.
+
+AUTH HANDLING (detailed)
+- Use secure cookie for refresh token if backend sets it; otherwise store `refresh_token` in memory or secure storage and minimize exposure.
+- Access token: store in memory (React context) or short-lived secure cookie; attach with `Authorization: Bearer <access_token>`.
+- Implement global fetch wrapper to automatically call `/auth/refresh` on 401 and retry once.
+
+ERRORS & RETRIES
+- Retry idempotent GETs up to 3 times with exponential backoff on network errors.
+- For file uploads, show resumable / chunked UI if file is large; otherwise show progress and retry option.
+
+TEST COMMANDS (run from frontend machine to validate connectivity)
+```bash
+curl -s "${API_BASE_URL}/api/v1/system/health" -H "ngrok-skip-browser-warning: true"
+```
+Expected: `{ "status": "healthy", "app_name": "MediVault AI", "version": "1.0.0" }`
+
+FIGMA AI USAGE GUIDELINES
+- Ask Figma AI to generate component tokens matching the design system colors and type scales in this prompt.
+- Request export-ready React/Next.js components: provide `props` shapes that match the API data shapes above so developers can wire API calls directly.
+- Instruct Figma AI to include example network call stubs (using `/lib/apiConfig.ts`) for each interactive component in the developer handoff.
+
+DELIVERABLES (what to expect from Figma AI output)
+- Figma file with complete design system, component library, auto-layout constraints, and annotated component tokens.
+- Exportable React/Next.js component code with network stubs wired to `BASE_URL` and centralized `apiConfig`.
+- A README.md with environment setup, how to point `NEXT_PUBLIC_API_BASE_URL` to the live tunnel URL, and how to run the generated frontend.
+
+NOTES / TROUBLESHOOTING
+- Tunnel URLs rotate for free ngrok. If APIs break, request the updated tunnel URL from the backend operator and update `NEXT_PUBLIC_API_BASE_URL`.
+- DB enums are case-sensitive; frontend must use lowercase enum values for `role` and `gender` when sending or displaying values.
+- If SSE requires custom headers, prefer `fetch` streaming over `EventSource`.
+
+VALIDATION CHECKLIST (run before building features)
+- Confirm `NEXT_PUBLIC_API_BASE_URL` points to the current tunnel URL.
+- Run the health check curl command above.
+- Ensure CORS and tunnel headers (`ngrok-skip-browser-warning`) are present in all requests.
+
+END

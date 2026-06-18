@@ -1,0 +1,62 @@
+PROMPT 1 — FRONTEND (UI/UX)
+
+PROJECT NAME: MEDIVAULT AI
+ ROLE: Lead UI/UX Product Designer
+ OBJECTIVE: Design a complete, production-grade, highly interactive UI/UX for a premium healthcare SaaS called MediVault AI.
+
+CRITICAL CROSS-NETWORK CONNECTIVITY REQUIREMENT:
+The frontend is hosted on a remote device in a geographically separate network (different city). The backend is hosted on a local machine at LAN IP 192.168.29.95, exposed to the public internet via a secure tunneling solution (e.g., ngrok, Cloudflare Tunnel, or frp). All Framer frontend components and network fetch configurations must be architected to resolve API calls against a configurable public tunnel base URL (e.g., https://<tunnel-subdomain>.ngrok.io or https://<tunnel>.trycloudflare.com), not any localhost or LAN address.
+Implement a centralized API config module (/lib/apiConfig.ts or equivalent) exporting a single BASE_URL constant that can be hot-swapped at build time via environment variable injection (NEXT_PUBLIC_API_BASE_URL or Framer's variable override system). Every data fetch, WebSocket connection, and file upload endpoint must consume this constant exclusively — zero hardcoded URL strings anywhere in component-level code. This architecture must support seamless endpoint migration (ngrok → production domain) with a single .env value change and zero component-level refactoring.
+
+DESIGN SYSTEM & BRANDING DATA:
+Tagline: "Your Personal Health Operating System"
+Primary Colors: Deep Blue #0A66FF, Teal #00C9A7
+Neutrals: Crisp Whites, Soft Gray canvas #F8F9FA, #F1F3F5; Deep Obsidian Dark Mode tokens #0D0E12, #1A1C23
+Design Language: Modern Apple Ecosystem meets Linear/Notion hierarchy. Clean glassmorphism (frosted blurs, subtle 1px inner borders), exceptional data density without clutter, high-contrast readability.
+Guidelines: Accessibility-first (WCAG AA/AAA compliant), zero placeholder text, full real-world medical data simulations. Deliver Desktop, Tablet, and Mobile viewport responsive variants using auto-layout.
+
+REQUIRED SCREENS & COMPONENT STATES:
+1. LANDING PAGE
+Hero Section: High-converting headline, CTA, and real-time interactive UI micro-preview.
+Product Demo & Feature Showcase: Deep-dives into the AI engine.
+AI Health Memory & Testimonials: Visual narrative of semantic memory tracking.
+Pricing, FAQ, and Footer: Clean structures with accordions and structural navigation.
+2. AUTHENTICATION (Responsive Flows)
+Login, Register, Forgot Password, and MFA token confirmation screens. All auth form submissions POST to ${BASE_URL}/api/v1/auth/*. JWT tokens received must be stored in httpOnly-equivalent secure storage and attached to all subsequent requests via Authorization: Bearer <token> headers.
+3. MAIN DASHBOARD (The Core Hub)
+Health Score Widget: Circular/radial dynamic visualization of historical wellness data.
+Layout grids tracking: Today's Medication, Upcoming Appointments, Active Health Alerts, Recent Symptoms/Reports, Family Member statuses, and streaming AI Insights.
+4. MEDICAL VAULT
+File dropzones for Prescriptions, Blood Reports, Scans, and Notes.
+Multi-view system: List views, grid card previews, structural tagging, category filters, and predictive global search.
+5. BLOOD REPORT ANALYZER
+Dual-pane layout: Original PDF/Image viewer alongside the AI Extraction Engine output.
+Interactive line graphs mapping historical biomarker vectors: Vitamin Profiles, Blood Sugar (HbA1c), Cholesterol (LDL/HDL), and Hemoglobin. Highlighting abnormal values with clear warning patterns.
+6. WHISPER AI JOURNAL
+Native voice-recording waveform UI, real-time live transcription output block, symptom/mood tags, and time-stamped timeline logs. Audio blobs POST to ${BASE_URL}/api/v1/journal/transcribe as multipart/form-data.
+7. HEALTH TIMELINE
+A multi-tiered, zoomable chronological gantt/scroller capturing historical symptoms, diagnoses, medical reports, prescriptions, appointments, and emergency events.
+8. AI ASSISTANT CHAT INTERFACE
+Context-aware conversational canvas with side-panel Chat History, suggested smart-prompts, inline file references, and citation anchors. Streaming responses consumed via EventSource or fetch with ReadableStream against ${BASE_URL}/api/v1/ai/chat.
+9. MEDICATION INTELLIGENCE
+Calendar grid/schedule tracker, adherence rates, automated refill warnings, and interactive drug-interaction/side-effect dropdown matrices.
+10. DOCTOR CONNECTIVITY
+Multi-step wizard: Specialized search filters, provider profile views, scheduling calendar, mock video consultation container, and medical records sharing toggles.
+11. FAMILY HEALTH HUB
+Sub-profile switcher, shared emergency contacts, and cooperative medication/care-plan tracking matrices.
+12. SMARTWATCH INTEGRATION
+High-density dashboard mapping continuous telemetry streams: Sleep phases, HRV, SpO2, Activity burn, and Stress markers via area charts. Polling ${BASE_URL}/api/v1/wearables/get_historical_metrics on a configurable interval.
+13. PERSONAL HEALTH TWIN
+A futuristic 3D/vector representation of structural health data mapping long-term risk vectors, lifestyle insight trends, and preventive health vectors.
+14. EMERGENCY CENTER
+High-visibility Emergency Health Card displaying Blood Group, Allergies, Critical Conditions, Active Medications, and an unauthenticated lock-screen bypass QR Code.
+Quick actions: One-tap ambulance dispatch, emergency proxy notifications, and instantaneous telemetry payload sharing.
+15. SETTINGS & ADMIN DASHBOARD
+Full-scale preferences for Account management, Privacy/Data isolation permissions, AI profile fine-tuning, and notification routing.
+Admin-facing panel tracking User Management, platform Analytics, manual report validation pipelines, and system AI prompt/token logs.
+
+DELIVERABLES PROTOCOL:
+ Generate a complete Design System in Figma/Framer including full component token libraries, Auto-Layout configurations for all viewport modes, precise interactive prototyping connections, and complete developer handoff assets. All network data ingestion must route exclusively through the BASE_URL environment variable pointing at the backend's public tunnel URL. Include a README section explicitly documenting the NEXT_PUBLIC_API_BASE_URL=https://<your-tunnel>.ngrok.io .env setup step required before running the frontend on any remote device.
+
+
+
